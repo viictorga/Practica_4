@@ -16,7 +16,7 @@ export const typeDefs = gql`
     startDate: String!
     endDate: String!
     owner: ID
-    members: [User!]
+    members: [User!]!
     tasks: [Task]
 
   }
@@ -44,12 +44,12 @@ export const typeDefs = gql`
   }
 
   type Mutation {
-    createProject(name: String!, startDate: String!, endDate: String!, members: [User]): Project!
+    createProject(name: String!, description: String, startDate: String!, endDate: String!, members: [User]): Project!
     register(email: String!, password: String!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
     updateProject(id: ID!,name:String, startDate:String, endDate:String, description: String, members: [User]): Project
-    addMember(projectId:ID!, userId: ID!): Proyect
-    createTask(projectId: ID!, title:String!, status:String, priority: String!, dueDate:String!): Task!
+    addMember(projectId:ID!, userId: ID!): Project
+    createTask(projectId: ID!, assignedTo:ID, title:String!, status:String, priority: String!, dueDate:String!): Task!
     updateTaskStatus(taskId: ID!, taskStatus: String!): Task
     deleteProject(id: ID!): Project
   }
