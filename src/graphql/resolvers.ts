@@ -8,6 +8,7 @@ import { createUser, validateUser } from "../collections/users";
 import { signToken } from "../auth";
 import { Projects } from "../types/Projects";
 import { Tasks } from "../types/Tasks";
+import { ProxyEnv } from "http";
 
 
 const COLLECTION_TASKS = "Tasks";
@@ -48,7 +49,8 @@ export const resolvers: IResolvers = {
         },
         members: async(parent: Projects) =>{
             const db = getDB();
-            return await db.collection<Users>(COLLECTION_USERS).find({$in : {_id: parent.members}}).toArray();
+            const ids = parent.members.map(id => new ObjectId(id));
+            return await db.collection<Users>(COLLECTION_USERS).find({_id : {$in: ids}}).toArray();
         }
         
     },
@@ -86,36 +88,41 @@ export const resolvers: IResolvers = {
             const a = await db.collection<Projects>(COLLECTION_PROJECTS).insertOne(nuevoProyecto);
             return await db.collection(COLLECTION_PROJECTS).findOne({_id: a.insertedId})
         },
-        // hay que mirarlo
         updateProject: async(_,{id, name, startDate, endDate, description, members},{user} )=>{
             if(!user) throw new Error("No tienes credenciales correctas");
             const db = getDB();
-            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: id});
+            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: new ObjectId(id)});
             if(!proyecto) throw new Error("No existe el proyecto")
-            if(proyecto.owner !== user._id) throw new Error("No eres el owner del proyecto")
-            const updates: any = {}
-            if (description) updates.description = description;
-            if (members) updates.members = members;
-            updates.name = name;
-            updates.startDate = startDate;
-            updates.endDate = endDate
+            if(proyecto.owner.toString() !== user._id.toString()) throw new Error("No eres el owner del proyecto")
+            id = proyecto._id;
+            if(!description) description = proyecto.description;
+            if(!members) members = proyecto.members;
+            if(!name) name = proyecto.name;
+            if(!startDate) startDate = proyecto.startDate;
+            if(!endDate) endDate = proyecto.endDate;
+            
 
-            return await db.collection(COLLECTION_PROJECTS).updateOne({_id: id}, {$set: {updates}});
+            await db.collection<Projects>(COLLECTION_PROJECTS).updateOne({_id: id}, {$set: {
+                 name, startDate, endDate, description, members
+            }});
+            
+            return await db.collection(COLLECTION_PROJECTS).findOne({_id: id})
+
 
         },
         addMember: async(_, {projectId, userId}, {user}) =>{
             if(!user) throw new Error("No tienes credenciales correctas");
             
             const db = getDB();
-            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: projectId});
+            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: new ObjectId(projectId)});
             if(!proyecto) throw new Error("No existe el proyecto")
-            if(proyecto.owner !== user._id) throw new Error("No eres el owner del proyecto")
+            if(proyecto.owner.toString() !== user._id.toString()) throw new Error("No eres el owner del proyecto")
             proyecto?.members?.push(new ObjectId(userId));
-            await db.collection(COLLECTION_PROJECTS).updateOne({_id: projectId}, {$set: {proyecto}})
+           
+            await db.collection(COLLECTION_PROJECTS).updateOne({_id: new ObjectId(projectId)}, {$set: {members : proyecto.members}})
 
-            return {
-                ...proyecto
-            }
+            return await db.collection(COLLECTION_PROJECTS).findOne({_id: proyecto._id})
+            
         },
         createTask: async(_, {projectId, title, status, priority, dueDate, assignedTo},{user}) =>{
             if(!user) throw new Error("No tienes credenciales correctas");
@@ -170,23 +177,23 @@ export const resolvers: IResolvers = {
         updateTaskStatus: async(_, {taskId, taskStatus}, {user}) =>{
             if(!user) throw new Error("No tienes credenciales correctas");
             const db = getDB();
-            let task = await db.collection<Tasks>(COLLECTION_TASKS).findOne({_id: taskId})
+            let task = await db.collection<Tasks>(COLLECTION_TASKS).findOne({_id: new ObjectId(taskId)})
             if(!task) throw new Error("no existe ese task");
-            if(taskStatus !== "PENDING" || taskStatus !== "IN_PROGRESS" || taskStatus!== "COMPLETED"){
+            if(taskStatus !== "PENDING" && taskStatus !== "IN_PROGRESS" && taskStatus!== "COMPLETED"){
                 taskStatus = "PENDING"
             }
-            return await db.collection(COLLECTION_TASKS).updateOne({_id: taskId},{$set: {status: taskStatus}})
-
+            await db.collection(COLLECTION_TASKS).updateOne({_id: new ObjectId(taskId)},{$set: {status: taskStatus}})
+            return await db.collection(COLLECTION_TASKS).findOne({_id: new ObjectId(taskId)})
         }, 
         deleteProject: async(_, {id}, {user}) =>{
             if(!user) throw new Error("No tienes credenciales correctas");
             const db = getDB();
-            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: id});
+            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: new ObjectId(id)});
             if(!proyecto) throw new Error("No existe el proyecto")
-            if(proyecto.owner !== user._id) throw new Error("No eres el owner del proyecto")
+            if(proyecto.owner.toString() !== user._id.toString()) throw new Error("No eres el owner del proyecto")
 
-            await db.collection(COLLECTION_PROJECTS).deleteOne({_id: id});
-            await db.collection(COLLECTION_TASKS).deleteMany({projectId: id});
+            await db.collection(COLLECTION_PROJECTS).deleteOne({_id: new ObjectId(id)});
+            await db.collection(COLLECTION_TASKS).deleteMany({projectId: new ObjectId(id)});
             return proyecto;
         }
 
