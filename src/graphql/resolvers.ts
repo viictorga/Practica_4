@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../db/mongo"
+
 import { IResolvers } from "@graphql-tools/utils";
 import { Users } from "../types/Users";
 import { AuthPayload } from "../types/AuthPayload";
@@ -16,7 +17,7 @@ const COLLECTION_USERS = "users";
 export const resolvers: IResolvers = {
     Query: {
         me: async (_, __, { user }) => {
-            if (!user) return null;
+            if (!user) throw new Error("no son las credenciales correctas " + user);
             return {
             _id: user._id.toString(),
             ...user
@@ -40,14 +41,20 @@ export const resolvers: IResolvers = {
 
     },
     Project:{
-        tasks: (parent: Projects) => {
+        tasks: async(parent: Projects) => {
             // Buscar en la coleccion de Task que tareas tienen como projectId el valor de parent._id
+            const db  = getDB();
+            return await db.collection<Tasks>(COLLECTION_TASKS).find({projectId: parent._id}).toArray();
+        },
+        members: async(parent: Projects) =>{
+            const db = getDB();
+            return await db.collection<Users>(COLLECTION_USERS).find({$in : {_id: parent.members}}).toArray();
         }
         
     },
     Mutation:{
-        register: async ( _,{ email, password }: { email: string; password: string }) => {
-            const userId = await createUser(email, password);
+        register: async ( _,{ email, password, username}) => {
+            const userId = await createUser(email, password, username);
             const token = signToken(userId);
             const payload : AuthPayload= {
                 token
@@ -64,7 +71,7 @@ export const resolvers: IResolvers = {
             }
             return payload;
         },
-        createProject: async(_, {name, startDate, endDate, members, description},{user})=>{
+        createProject: async(_, {name, startDate, endDate, members, description} : {name : string, startDate: Date, endDate : Date, members : Array<ObjectId>, description : string },{user})=>{
            if(!user) throw new Error("No tienes credenciales correctas");
             const db = getDB();
             
@@ -76,7 +83,8 @@ export const resolvers: IResolvers = {
                 members,
                 owner:  user._id
             }
-            return await db.collection<Projects>(COLLECTION_PROJECTS).insertOne(nuevoProyecto);
+            const a = await db.collection<Projects>(COLLECTION_PROJECTS).insertOne(nuevoProyecto);
+            return await db.collection(COLLECTION_PROJECTS).findOne({_id: a.insertedId})
         },
         // hay que mirarlo
         updateProject: async(_,{id, name, startDate, endDate, description, members},{user} )=>{
@@ -113,8 +121,30 @@ export const resolvers: IResolvers = {
             if(!user) throw new Error("No tienes credenciales correctas");
             
             const db = getDB();
-            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: projectId});
+            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: new ObjectId(projectId)});
             if(!proyecto) throw new Error("No existe el proyecto")
+            if(!proyecto.members){
+                if(proyecto.owner.toString() !== user._id.toString()){
+                     throw new Error("No eres owner ni miembro")
+                }
+                if(status !== "PENDING" || status !== "IN_PROGRESS" || status !== "COMPLETED"){
+                status = "PENDING"
+                }
+                if(priority != "LOW" && priority != "MEDIUM" && priority != "HIGH"){
+                    throw new Error("La prioridad es incorrecta")
+                }
+
+                const newTask: Tasks = {
+                    title,
+                    status,
+                    priority, 
+                    dueDate,
+                    projectId,
+                    assignedTo
+                }
+                const a = await db.collection(COLLECTION_TASKS).insertOne(newTask);
+                return await db.collection(COLLECTION_TASKS).findOne({_id: a.insertedId})
+            }
             const esMiembro = proyecto.members!.some((n) => user._id === n)
             if((proyecto.owner !== user._id) && (!esMiembro)) throw new Error("No eres owner ni miembro")
             
@@ -122,7 +152,7 @@ export const resolvers: IResolvers = {
             if(status !== "PENDING" || status !== "IN_PROGRESS" || status !== "COMPLETED"){
                 status = "PENDING"
             }
-            if(priority !== "LOW" || priority !== "MEDIUM" || priority !== "HIGH"){
+            if(priority != "LOW" && priority != "MEDIUM" && priority != "HIGH"){
                 throw new Error("La prioridad es incorrecta")
             }
 
@@ -134,8 +164,8 @@ export const resolvers: IResolvers = {
                 projectId,
                 assignedTo
             }
-            await db.collection(COLLECTION_TASKS).insertOne(newTask);
-
+            const a = await db.collection(COLLECTION_TASKS).insertOne(newTask);
+            return await db.collection(COLLECTION_TASKS).findOne({_id: a.insertedId})
         }, 
         updateTaskStatus: async(_, {taskId, taskStatus}, {user}) =>{
             if(!user) throw new Error("No tienes credenciales correctas");
@@ -147,7 +177,18 @@ export const resolvers: IResolvers = {
             }
             return await db.collection(COLLECTION_TASKS).updateOne({_id: taskId},{$set: {status: taskStatus}})
 
-        }  
+        }, 
+        deleteProject: async(_, {id}, {user}) =>{
+            if(!user) throw new Error("No tienes credenciales correctas");
+            const db = getDB();
+            let proyecto = await db.collection<Projects>(COLLECTION_PROJECTS).findOne({_id: id});
+            if(!proyecto) throw new Error("No existe el proyecto")
+            if(proyecto.owner !== user._id) throw new Error("No eres el owner del proyecto")
+
+            await db.collection(COLLECTION_PROJECTS).deleteOne({_id: id});
+            await db.collection(COLLECTION_TASKS).deleteMany({projectId: id});
+            return proyecto;
+        }
 
     }
 }

@@ -6,7 +6,7 @@
     title: string, 
     projectId: ObjectId,
     assignedTo?: ObjectId,
-    status: "PENDING" | "IN_PROGRESS" |"COMPLETED", 
-    priority: "LOW" | "MEDIUM" |"HIGH",
+    status: string, 
+    priority: string,
     dueDate: Date
  }

@@ -9,13 +9,15 @@ const COLLECTION_PROJECTS = "Projects";
 const COLLECTION_USERS = "users";
 
 
-export const createUser = async (email: string, password: string) => {
+export const createUser = async (email: string, password: string, username: string) => {
     const db = getDB();
     const toEncriptao = await bcrypt.hash(password, 10);
 
     const result = await db.collection(COLLECTION_USERS).insertOne({
         email,
-        password: toEncriptao
+        password: toEncriptao,
+        username,
+        createdAt: Date.now()
     });
 
     return result.insertedId.toString();

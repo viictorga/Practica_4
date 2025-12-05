@@ -9,25 +9,26 @@ export const typeDefs = gql`
     password: String!
     createdAt: String
   }
-  type Project{
-    _id: ID!
-    name: String!
-    description: String
-    startDate: String!
-    endDate: String!
-    owner: ID
-    members: [User!]!
-    tasks: [Task]
-
-  }
+ 
   type Task{
-    _id: ObjectId
+    _id: ID!
     title: String!
     projectId: ID!
     assignedTo: ID
     status: String
     priority: String
     dueDate: String
+
+  }
+   type Project{
+    _id: ID!
+    name: String!
+    description: String
+    startDate: String!
+    endDate: String!
+    owner: ID
+    members: [User]
+    tasks: [Task]
 
   }
   type AuthPayload {
@@ -40,14 +41,14 @@ export const typeDefs = gql`
     me: User
     myProjects: [Project!]
     projectDetails(projectId: ID!): Project
-    users: [User!]!
+    users: [User]!
   }
 
   type Mutation {
-    createProject(name: String!, description: String, startDate: String!, endDate: String!, members: [User]): Project!
-    register(email: String!, password: String!): AuthPayload!
+    createProject(name: String!, description: String, startDate: String!, endDate: String!, members: [ID]): Project!
+    register(email: String!, password: String!, username: String!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
-    updateProject(id: ID!,name:String, startDate:String, endDate:String, description: String, members: [User]): Project
+    updateProject(id: ID!,name:String, startDate:String, endDate:String, description: String, members: [ID]): Project
     addMember(projectId:ID!, userId: ID!): Project
     createTask(projectId: ID!, assignedTo:ID, title:String!, status:String, priority: String!, dueDate:String!): Task!
     updateTaskStatus(taskId: ID!, taskStatus: String!): Task
