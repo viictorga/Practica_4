@@ -45,7 +45,10 @@ export const resolvers: IResolvers = {
         tasks: async(parent: Projects) => {
             // Buscar en la coleccion de Task que tareas tienen como projectId el valor de parent._id
             const db  = getDB();
-            return await db.collection<Tasks>(COLLECTION_TASKS).find({projectId: parent._id}).toArray();
+            console.log(parent._id)
+            const a =  await db.collection<Tasks>(COLLECTION_TASKS).find({projectId: parent._id?.toString()}).toArray();
+            console.log(a)
+            return a;
         },
         members: async(parent: Projects) =>{
             const db = getDB();
