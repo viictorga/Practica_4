@@ -76,7 +76,7 @@ export const resolvers: IResolvers = {
         createProject: async(_, {name, startDate, endDate, members, description} : {name : string, startDate: Date, endDate : Date, members : Array<ObjectId>, description : string },{user})=>{
            if(!user) throw new Error("No tienes credenciales correctas");
             const db = getDB();
-            
+            if(endDate < startDate)throw new Error("No puede finalizar antes de empezar")
             const nuevoProyecto : Projects = {
                 name,
                 startDate,
